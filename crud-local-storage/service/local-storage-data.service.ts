@@ -54,7 +54,7 @@ export class LocalStorageDataService {
     await this.storage.defineDriver(CordovaSQLiteDriver);
     await this.storage.create();
     console.log('DONE, FIN DE INIT');
-    await this.setLOGIN_User_Kery(DEFAULT_USER,DEFAULT_KEY);
+    await this.setLOGIN_User_Key(DEFAULT_USER,DEFAULT_KEY);
     this.storageReady.next(true);
     console.timeEnd("Init: Tiempo de ejecución ");
   }
@@ -125,7 +125,7 @@ export class LocalStorageDataService {
    * Creando "Login" para establecer un Contenedor para un Usuario (si el user no Existe se crea Uno nuevo)
    * Cifrando 10 veces la PASS con SHA512, antes de establecerla al contenedor
    */ 
-   async setLOGIN_User_Kery(user: string, pass: string) {
+   async setLOGIN_User_Key(user: string, pass: string) {
     try {
       let passSHA512 = pass;
 
