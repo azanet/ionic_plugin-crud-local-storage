@@ -1,14 +1,32 @@
 //########################################################################################
-//  INTERFACE PARA DEFINIR "UNA CLAVE" QUE IDENTIFIQUE "subColecciones" de las COLECCIONES 
+//  INTERFACES PARA DEFINIR "OBJETOS" Tipo "VADEMECUM" (esta será la COLECCION "Vademecum")   ## 
 //########################################################################################
 /**
- * MODELO para Objetos VADEMECUM y Modelo de Las "distintas" PRIMARY_KEYS
- * que utilizaremos para trabajar con esta.
+ * Se definen "enum e interfaces" Para trabajar con Objetos VADEMECUM("distintas" PRIMARY_KEYS) 
+ * Y Modelo del OBJETO "DRUG" (que será de los objetos que se componga la coleccion "Vademecum" 
  */
 
 import { OptsDrugUnit, OptsVademecApiURL, OptsVademecTitle, OptsVademecType } from "../interfaces/vademecum-enum";
 import { OptsObjType } from "../interfaces/collections-enum";
 
+
+/**
+ * NOMBRE DE KEYS- UTILIZADAS PARA CREAR LAS CLAVES_PRIMARIAS
+ */
+
+//Para Identificar por "TIPO" de "VADEMECUM"
+  export enum KEY_Vademecum{
+    objtype = 'objtype'
+  }
+
+  //Para Identificar por "TIPO" de "VADEMECUM"
+export enum KEY_VademecumType{
+  type = 'type'
+}
+//Para Identificar MEDICAMENTO INEQUIVOCAMENTE por "Nº DE REGISTRO" de un "TIPO" de "VADEMECUM"
+export enum KEY_VademecumObjDrug{
+  nrecords = 'nrecords'
+}
 
 
 /**

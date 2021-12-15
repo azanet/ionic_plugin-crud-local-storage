@@ -7,6 +7,7 @@ import { filter, switchMap } from 'rxjs/operators';
 
 import { ItemExist } from './myerrors';
 import { ObjResponse, KeyVal_To_PrimaryKey } from './dont-touch-models';
+import { ObjectDrugModel } from '../models/vademecum-models';
 
 
 
@@ -23,7 +24,7 @@ const DEFAULT_KEY = 'I_AM_THE_GUEST_PASS!';
 
 export class LocalStorageDataService {
 
-//Usuario POR DEFECTO 
+  //Usuario POR DEFECTO 
   STORAGE_KEY = 'GUEST';
 
   //Variable para COMPROBAR que los Servicios se hallan INICIADO
@@ -37,37 +38,117 @@ export class LocalStorageDataService {
    */
   constructor(private storage: Storage) {
     //Lanzamos INIT, y termina el constructor, Init se quedará resolviendo sus problemas solo y ya terminará.
-    console.time("Constructor: Tiempo de ejecución ");
+ //   console.time("Constructor: Tiempo de ejecución ");
     console.log("CONSTRUCTOR");
 
     this.init();
     console.log("FIN DE CONSTRUCTOR");
-    console.timeEnd("Constructor: Tiempo de ejecución ");
+ //   console.timeEnd("Constructor: Tiempo de ejecución ");
   }
 
   /**
    * Inicia la BBDD (que está declarandose en el 'app.module.ts')
    */
   private async init() {
-    console.time("Init: Tiempo de ejecución ");
-    console.log('INIT');
-    await this.storage.defineDriver(CordovaSQLiteDriver);
-    await this.storage.create();
-    console.log('DONE, FIN DE INIT');
-    await this.setLOGIN_User_Key(DEFAULT_USER,DEFAULT_KEY);
-    this.storageReady.next(true);
-    console.timeEnd("Init: Tiempo de ejecución ");
+    try {
+ //     console.time("Init: Tiempo de ejecución ");
+      console.log('INIT');
+      await this.storage.defineDriver(CordovaSQLiteDriver);
+      await this.storage.create();
+      console.log('DONE, FIN DE INIT');
+      await this.setLOGIN_User_Key(DEFAULT_USER, DEFAULT_KEY);
+      this.storageReady.next(true);
+ //     console.timeEnd("Init: Tiempo de ejecución ");
+    } catch (err) {
+      console.log('Error Iniciando la LocalStorage.');
+    }
   }
 
   /** 
    * Función para Cifrar la pass
-   */ 
- private sha512(str) {
+   */
+  private sha512(str) {
     return crypto.subtle.digest("SHA-512", new TextEncoder().encode(str)).then(buf => {
       return Array.prototype.map.call(new Uint8Array(buf), x => (('00' + x.toString(16)).slice(-2))).join('');
     });
   }
 
+  //--------------------------------------------------------
+
+
+
+
+  /**
+   * "SOLO COMPRUEBA SI *LA PRIMARY_KEY - proporcionada EXISTE*" 
+   * Agregar ITEM/OBJETO a al "bucket" correspondiente al usuario (En caso de no Existir).
+   * Recibe un Item, y solo nos preocupamos de:
+   * -- o RECOGER el ARRAY que nos devolverá, en caso de INSERTADO CORRECTO.
+   * -- o CONTROLAR el ERROR, en caso de que YA Exista o Haya ocurrido un error inesperado.
+   *--------------------------------------------------------------------------
+   * Se utilizaría para TRABAJAR CON CLAVES,
+   * Evitaría la DUPLICIDAD del OBJETO solo si LA PRIMARY_KEY EXISTE  
+   * ---------------------------------------------------------------------------
+   * 
+   * Este Método, LLAMA AL MÉTODO "getItemsCollection_ByMultiple_KeysValues"
+   * El cuál le DEVOLVERÁ el "OBJETO" si existe, == si recibimos esto,(NO Agregará el Objeto)
+   * Si no Recibimos NADA, significará que no existe == si recibimos esto,(SI SE agregará el OBJETO)
+   * -------------------------------------------------------------------------------------
+   * 
+   * SOLO COMPRUEBA SI *EXISTE ALGUN Objeto "CON LA PRIMARY_KEY PRoporcionada"*
+   * @param arrPrimaryKeys - PRIMARY_KEY (LA COMPUESTA, aunque venga Una Sola)
+   * @param item - El Item a AGREGAR
+   * @return - Devuelve TODO EL "Bucket" del usuario(actualizado)
+   * ------------------------------------------------------------------------
+   * Ejemplo:
+   * const arrBucketReturn = await this.addItem_by_PRIMARY_KEY( PK_FINAL );
+  */
+   addItem_by_PRIMARY_KEY(arrPrimaryKeys: Array<KeyVal_To_PrimaryKey>,item: ObjectDrugModel) {
+    //   const storedData = await this.storage.get(STORAGE_KEY) || [];
+
+    return new Promise((res, err) => {
+
+      this.getItemsCollection_ByMultiple_KeysValues(arrPrimaryKeys).then((objCollect: Array<ObjectDrugModel>) => {
+
+        //Comprobamos que el método NO RETORNE NADA, si no, significa que existe
+
+        if (objCollect.length === 0) {
+         //Solicitamos TODO el contenedor para SETEAR La DATA NUEVA
+          this.getLocalStoredData().then((resStoredData: Array<ObjectDrugModel>)=> {
+
+
+            if(resStoredData === null){
+              resStoredData = [];
+            }
+          //añadiendo Resgistro/ENTRADA Nueeva 
+          resStoredData.push(item);
+
+          //Guardando los cambios y Retornando la lista actualizada
+          res(this.storage.set(this.STORAGE_KEY, resStoredData));
+
+          }).catch(errLS=> 
+            err([]) 
+          );
+
+
+        } else {
+          //Lanzando Error Personalizado
+          err(new ItemExist('El Item ya Existe en la lista!'));
+        }
+
+        //Si el Resulta obtenido en el Index es -1, Significa que NO EXISTE EN LA BBDD
+      }).catch(objErr => {
+        //Controlando el Error, para ver "que retornamos en el Error", Y Que Pueda Contolarse fuera
+        if (objErr instanceof ItemExist) {
+          //Volvemos a mandar el Error personalizado para que se reciba FUERA!!
+          err(new ItemExist('El Item ya Existe en la lista!'));
+        } else {
+          // console.log('SERVICIO LocalStorage - Error en Intentando Remover el Objeto'+ err);
+          err('SERVICIO LocalStorage - Error en Intentando Agregar el Objeto');
+        }
+      });
+
+    });
+  }
 
 
 
@@ -124,8 +205,8 @@ export class LocalStorageDataService {
   /**
    * Creando "Login" para establecer un Contenedor para un Usuario (si el user no Existe se crea Uno nuevo)
    * Cifrando 10 veces la PASS con SHA512, antes de establecerla al contenedor
-   */ 
-   async setLOGIN_User_Key(user: string, pass: string) {
+   */
+  async setLOGIN_User_Key(user: string, pass: string) {
     try {
       let passSHA512 = pass;
 
@@ -133,9 +214,9 @@ export class LocalStorageDataService {
         const cypher = await this.sha512(passSHA512);
         passSHA512 = Object(cypher).toString();
       }
-     //Almacenando el User, con la clave cifrada en SHA512 con 10 iteraciones
+      //Almacenando el User, con la clave cifrada en SHA512 con 10 iteraciones
       this.STORAGE_KEY = user + ":" + passSHA512;
-  //    console.log(this.STORAGE_KEY);
+      //    console.log(this.STORAGE_KEY);
     } catch (err) {
       console.log('ERROR estableciendo el USER:KEY para el Contenedor.');
     }
@@ -149,7 +230,7 @@ export class LocalStorageDataService {
    */
   getLocalStoredData() {
 
-    console.log("Cargando Data");
+ //   console.log("Cargando Data");
     return new Promise(res => {
       this.getBucketData().subscribe(response => {
         res(response);
@@ -197,7 +278,12 @@ export class LocalStorageDataService {
 
       this.getItemIndex_And_ReturnAllBuck(item).then(objResponse => {
 
-        if (objResponse.index <= -1) {
+        if ( objResponse.storedData === null || objResponse.index <= -1) {
+
+          if(objResponse.storedData === null){
+            objResponse.storedData = [];
+          }
+
           //añadiendo Resgistro/ENTRADA Nueeva 
           objResponse.storedData.push(item);
           //Guardando los cambios y Retornando la lista actualizada
@@ -287,8 +373,12 @@ export class LocalStorageDataService {
 
         if (objRes.index > -1) {
           objRes.storedData.splice(objRes.index, 1);
-          console.log('SERVICIO LocalStorage - Dentro del removee!!:' + objRes.index + objRes.storedData);
-          res(this.storage.set(this.STORAGE_KEY, objRes.storedData));
+  //        console.log('SERVICIO LocalStorage - Dentro del removee!!:' + objRes.index + objRes.storedData);
+          this.storage.set(this.STORAGE_KEY, objRes.storedData);
+          res(true);
+        }else{
+
+          res(false);
         }
 
       }).catch(indError => {
@@ -353,12 +443,12 @@ export class LocalStorageDataService {
     return new Promise(res => {
       //Resolvemos el observable
       this.getBucketData().subscribe((data: any) => {
+
         //_Comprobamos que no esté vacia la RESPUESTA
         if (data != null && data.length > 0) {
           //@Key   => Es el valor COMPLETO del registro correspondiente a esa posicion 
           //@value => El NUMERO de INDEX en el que el REGISTRO está en la lista
           //@index => retorna TODOS los INDEX de los Registros actuales   
-          console.time('ForE: ');
           //Iterando TODA la DATA del LocalStorage
           data.forEach((key, value, index) => {
 
@@ -429,7 +519,6 @@ export class LocalStorageDataService {
       //Resolvemos el observable
       this.getBucketData().subscribe((data: any) => {
 
-        console.log('DENTRO DEL then');
         //_Comprobamos que no esté vacia la RESPUESTA
         if (data != null && data.length > 0) {
           //@Key   => Es el valor COMPLETO del registro correspondiente a esa posicion 
@@ -453,11 +542,13 @@ export class LocalStorageDataService {
   //-------------------------------------------------------------------------------------------
   /**
     * Obteniendo "DATA del CONTENEDOR("Bucket") sociado al USUARIO actual" 
+    * SE ASEGURA DE QUE "TODO ESTé CARGADO"- (No devuelve los datos Hasta que el servicio esté listo)
+    * Evitando Errores
     * (por defecto se monta un user "GUEST")
     * RETORNA UN OBSERVABLEE!!
     */
   private getBucketData(): any {
-    console.log('GET DATA');
+//    console.log('GET DATA');
     //Asegurandonos de que EL ALMACENAMIENTO está PREPARADO!
     return this.storageReady.pipe(
       filter(ready => ready),
@@ -466,7 +557,7 @@ export class LocalStorageDataService {
       })
     );
 
-    
+
   }
 
 
@@ -512,12 +603,12 @@ export class LocalStorageDataService {
 
             //Determiando si Los Objetos SON IDENTICAMENTE IGUALES (Identicos)
             if (JSON.stringify(key) === JSON.stringify(item)) {
-              console.log('SERVICIO LocalStorage - LOS ITEMS COINCIDEEEN!!!!!' + value);
+  //            console.log('SERVICIO LocalStorage - LOS ITEMS COINCIDEEEN!!!!!' + value);
               //En caso de encontrarse en la coleccion, Retornamos el "value" (que se corresponde con el INDEX OFICIAL del Item)
               objResponse.index = value;//Seteando al OBJETO con el INDEX al que pertenece
               res(objResponse); //Seteamos 'el valor BUENO' de la Promesa(será lo que devuelva. nuestor index)
             } else {
-              console.log('SERVICIO LocalStorage -LOS ITEMS  no coincideen!!');
+  //            console.log('SERVICIO LocalStorage -LOS ITEMS  no coincideen!!');
             }
           });
           //En caso de NO encontrarse en la coleccion, Retornamos el "-1" que se corresponde con LA AUSENCIA del Item en la BBDD
@@ -533,6 +624,63 @@ export class LocalStorageDataService {
       });
     });
   }
+
+
+
+
+
+
+
+
+/**
+ * Igual que el de Retornar las coleccion por las PK, 
+ * pero este comprueba SI CONTIENE PARTE DEL "VALUE",de las Keys que se les pasa
+ * PARA PODER REALIZAR BÚSQUEDAS Y RETORNAR COINCIDENCIAS.
+ * @param arrPrimaryKeys 
+ * @returns 
+ */
+  findItemsCollection_ByMultiple_KeysValues(arrPrimaryKeys: Array<KeyVal_To_PrimaryKey>) {
+
+    let list = []; //Contendrá las coincidencias encontradas de la Busqueda
+
+    return new Promise(res => {
+      //Resolvemos el observable
+      this.getBucketData().subscribe((data: any) => {
+
+        //_Comprobamos que no esté vacia la RESPUESTA
+        if (data != null && data.length > 0) {
+          //@Key   => Es el valor COMPLETO del registro correspondiente a esa posicion 
+          //@value => El NUMERO de INDEX en el que el REGISTRO está en la lista
+          //@index => retorna TODOS los INDEX de los Registros actuales   
+          //Iterando TODA la DATA del LocalStorage
+          data.forEach((key, value, index) => {
+
+            let exist = true;//Variable para controlar SI CUMPLE con TODOS los KEY/VALUES que RECIBE
+
+            //ITERAMOS el Arreglo de KEY/VALUES enviado para "EMULAR LAS PRIMARY_KEYS"
+            arrPrimaryKeys.forEach(arrKeyValue => {
+
+              if ((key[arrKeyValue['key']]).toString().toUpperCase().includes(arrKeyValue['value'].toUpperCase()) === false) {
+                exist = false;
+              }
+            });
+            if (exist) {
+              list.push(key);
+            }
+          });
+        }
+        res(list);
+      });
+    });
+  }
+
+
+
+
+
+
+
+
 
 
 

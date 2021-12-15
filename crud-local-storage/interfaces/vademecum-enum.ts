@@ -2,15 +2,6 @@ import { OptsObjType } from 'src/plugin/crud-local-storage/interfaces/collection
 
 
 
-
-export enum VademecumType_Key{
-  type = 'type'
-}
-
-export enum VademecumObjDrug_Key{
-  nrecords = 'nrecords'
-}
-
 /**
  * Tipo de 'Vademecum' al que pertenece
  * será de tipo Veterinario o Humano.

@@ -8,7 +8,7 @@
  * y es la mejor idea que se me ha ocurrido. Espero encontrar una mejor.
 */ 
 export enum CommonKey{
-  objType = 'objtype'
+  objType = "objtype"
 }
 
 /**
